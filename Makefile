@@ -13,20 +13,17 @@ LOG_FILENAME = log.txt
 # Create the zip file for submission
 zip:
 	zip $(ZIP_FILENAME) *.h *.cpp Makefile README
-# Creating the  executable
+# Creating the  executable, This is the Server 
 ttftps: $(OBJS)
 	$(CCLINK) -o ttftps $(OBJS)
 # Creating the object files
 ttftps.o: ttftps.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
-atm.o: atm.cpp
+clients.o: clients.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
-locks.o: locks.cpp
+errors.o: errors.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
-bank_manager.o: bank_manager.cpp
-	$(CC) -c $(CFLAGS) $< -o $@
-logger.o: logger.cpp
-	$(CC) -c $(CFLAGS) $< -o $@
+
 # Cleaning old files before new make
 clean:
 	$(RM) $(TARGET) *.o *~ "#"* core.* Bank
