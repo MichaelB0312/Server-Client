@@ -6,7 +6,7 @@ CFLAGS = -std=c++11 -Wall -g -pedantic -DNDEBUG -pthread
 # CFLAGS = -std=c++11 -Wall -Werror -pedantic -pedantic-errors -DNDEBUG
 # CFLAGS = -g -Wall
 CCLINK = $(CC)
-OBJS = Bank.o atm.o locks.o bank_manager.o logger.o
+OBJS = ttftps.o clients.o errors.o
 RM = rm -f
 ZIP_FILENAME = 316124221_206013914.zip
 LOG_FILENAME = log.txt
