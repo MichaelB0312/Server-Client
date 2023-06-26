@@ -5,11 +5,17 @@
 #include <netinet/in.h>
 #include <limits.h>
 #include <iostream>
+#include "clients.h"
 
-bool isWRQ(char* clientMSG, unsigned MSGlen) {
+#define WRQ_OP 0x02
+#define ACK_OP 0x04
+#define DATA_OP 0x03
 
-	for (size_t i = 0; i < MSGlen; ++i) {
-		char character = clientMSG[i];
-		//check it
-		if (character >= 0x20 && character <= 0x7E)
+
+
+int get_msg(char* buffer, unsigned int cliAddrLen) {
+
+	// first find
+	//see opcode:
+	if( buffer[0] == WRQ_OP)
 }
