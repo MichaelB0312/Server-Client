@@ -16,6 +16,7 @@ using namespace std;
 #define ACK_OP 0x04
 #define DATA_OP 0x03
 
+
 ///////********* THIS A TEMPLATE FOR UDP SERVER FROM TUT.9 P.56-58 **************///////////
 ///////////////////////////////////////////////////////////////////////////////////////////
 #define ECHOMAX 516 /* Longest string to echo */
@@ -43,6 +44,8 @@ int main(int argc, char* argv[]) {
 	unsigned short max_num_of_resends = atoi(argv[3]);
 
 	int WRQ_flag = 0; int ACK_flag = 0;
+	int SessionEnd_flag = 0; // raise flag when session has terminated normally (without errors and client
+							//  send data length less than 512 bytes
 	int recvMsgSize; /* Size of received message */
 
 	/* Create socket for sending/receiving datagrams */
@@ -66,6 +69,11 @@ int main(int argc, char* argv[]) {
 		sizeof(echoServAddr)) < 0)
 		error("bind() failed");
 
+	struct sockaddr_in currClntAddr;
+	int fail_cnt = 0;
+	unsigned short curr_data_block = 1;
+
+	/* START RUNNING THE SERVER */
 	for (;;) { /* Run forever */
 		/* Set the size of the in-out parameter */
 		cliAddrLen = sizeof(echoClntAddr);
@@ -79,41 +87,86 @@ int main(int argc, char* argv[]) {
 		timer.tv_usec = 0;
 
 		/* Select is Blocking until receive message from a client */
-		int readyCheck = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
+		while (true) {
 
-		if (readyDescriptors == -1) {
-			perror("TTFTP_ERROR: select() error");
-			exit(1);
-		}
-		else if (readyDescriptors == 0) {
-			//send ACK again. increase failure counter
+			//Error "Abandoning file transmission"
+			if (fail_cnt > timeout) {
+				//send Error "Abandoning file transmission" in the wright format: TODO
+			}
+
+			int readyCheck = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
+
+			if (readyCheck == -1) {
+				perror("TTFTP_ERROR: select() error");
+				exit(1);
+			}
+			else if (readyCheck == 0) { //timval seconts have passed
+				//send ACK again. TODO
+				fail_cnt++;
+			}
+			// Check if sockfd is ready for reading
+			if (FD_ISSET(sockfd, &readfds)) break;
+
 		}
 
 		//if Server socket is ready, get the packet:
 		if ((recvMsgSize = recvfrom(sock, echoBuffer, ECHOMAX, 0,
 			(struct sockaddr*)&echoClntAddr, &cliAddrLen)) < 0) { //TODO: maybe we need to use select here or in errors.cpp
-			perror("TTFTP_ERROR: recvfrom() failed"); //TODO: handle error situations in errors.cpp
+			perror("TTFTP_ERROR: recvfrom() failed"); 
 			exit(1);
 		}
 		//TODO: need to examine between first message WRQ--> open an inode
 		//      and other messages(DATA)
 
+		
 		// check if it's WRQ packet:
-		if (echoBuffer[0] == WRQ_OP) {
+		if (echoBuffer[0] == WRQ_OP && !WRQ_flag) { //first WRQ packet
 
-			//check if the file already exists in Server File System!!!!!!!!!!!! before get what the string is
+			currClntAddr.sin_addr.s_addr = echoClntAddr.sin_addr.s_addr;
+			currClntAddr.sin_port = ntohs(echoClntAddr.sin_port);
+			//check if the file already exists in Server File System!!!!!!!!!!!! before getting what the data is
 			string filename;
 
 			for (auto i = 2 * sizeof(short); *i != '\0'; ++i)){
 				filename += echoBuffer[i]
 			}
 			ifstream file(filename);
-			if (!file.good()) { //file doesn't exist
+			if (!file.good()) { //file doesn't exist, new file has arrived!
 				WRQ_flag = 1;
 			}
-			else //send Error File already exist in the wright format:
+			else //send Error "File already exist" in the wright format: TODO
 			
 		}
+
+		//send Error "Unexpected packet" in the wright format: TODO
+		if (!SessionEnd_flag && ((echoBuffer[0] == WRQ_OP) ||
+								(currClntAddr.sin_port != ntohs(echoClntAddr.sin_port)
+								|| (currClntAddr.sin_addr.s_addr != echoClntAddr.sin_addr.s_addr)) {
+
+			//send Error "Unexpected packet" in the wright format: TODO
+		}
+
+		
+		
+		//error : Client's first packet is not WRQ 
+		if ((echoBuffer[0] != WRQ_OP) && !WRQ_flag) {
+			//send Error "Uknown user" in the wright format: TODO
+		}
+
+		
+		if (echoBuffer[0] == DATA_OP) {
+			// parse DATA packet block number
+			rec_block_num = (static_cast<unsigned char>(buffer[2]) << 8) | static_cast<unsigned char>(buffer[3]);
+			//error: "Bad block number"
+			if (rec_block_num != (curr_data_block + 1)) {
+				//send Error "Bad block number" in the wright format: TODO
+			}
+		}
+
+
+
+		
+
 		/* Send received datagram back to the client */
 		//TODO: send ACK{0..1..2} to client
 		if (sendto(sock, echoBuffer, recvMsgSize, 0,
