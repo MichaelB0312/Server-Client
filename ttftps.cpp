@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fstream>
+#include <iostream>
 
 using namespace std;
 
@@ -70,8 +71,9 @@ int main(int argc, char* argv[]) {
 		error("bind() failed");
 
 	struct sockaddr_in currClntAddr;
-	int fail_cnt = 0;
-	unsigned short curr_data_block = 1;
+	int fail_cnt = 1;
+	unsigned short curr_data_block = 0x0;
+	unsigned short ACK_block_num = 0x0;
 
 	/* START RUNNING THE SERVER */
 	for (;;) { /* Run forever */
@@ -86,12 +88,15 @@ int main(int argc, char* argv[]) {
 		timer.tv_sec = (time_t)timeout;
 		timer.tv_usec = 0;
 
+		fail_cnt = 1;
+		
 		/* Select is Blocking until receive message from a client */
 		while (true) {
 
 			//Error "Abandoning file transmission"
 			if (fail_cnt > timeout) {
 				//send Error "Abandoning file transmission" in the wright format: TODO
+				fail_cnt = 1; //start the counting again
 			}
 
 			int readyCheck = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
@@ -108,23 +113,22 @@ int main(int argc, char* argv[]) {
 			if (FD_ISSET(sockfd, &readfds)) break;
 
 		}
+		
 
 		//if Server socket is ready, get the packet:
 		if ((recvMsgSize = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-			(struct sockaddr*)&echoClntAddr, &cliAddrLen)) < 0) { //TODO: maybe we need to use select here or in errors.cpp
+			(struct sockaddr*)&echoClntAddr, &cliAddrLen)) < 0) { 
 			perror("TTFTP_ERROR: recvfrom() failed"); 
 			exit(1);
 		}
-		//TODO: need to examine between first message WRQ--> open an inode
-		//      and other messages(DATA)
-
+		
 		
 		// check if it's WRQ packet:
 		if (echoBuffer[0] == WRQ_OP && !WRQ_flag) { //first WRQ packet
 
 			currClntAddr.sin_addr.s_addr = echoClntAddr.sin_addr.s_addr;
 			currClntAddr.sin_port = ntohs(echoClntAddr.sin_port);
-			//check if the file already exists in Server File System!!!!!!!!!!!! before getting what the data is
+			
 			string filename;
 
 			for (auto i = 2 * sizeof(short); *i != '\0'; ++i)){
@@ -133,6 +137,7 @@ int main(int argc, char* argv[]) {
 			ifstream file(filename);
 			if (!file.good()) { //file doesn't exist, new file has arrived!
 				WRQ_flag = 1;
+				ofstream file(fileName); //add file to current cd
 			}
 			else //send Error "File already exist" in the wright format: TODO
 			
@@ -153,27 +158,32 @@ int main(int argc, char* argv[]) {
 			//send Error "Uknown user" in the wright format: TODO
 		}
 
-		
+		/* Response to DATA packet */
 		if (echoBuffer[0] == DATA_OP) {
 			// parse DATA packet block number
-			rec_block_num = (static_cast<unsigned char>(buffer[2]) << 8) | static_cast<unsigned char>(buffer[3]);
+			rec_block_num = (static_cast<unsigned char>(echoBuffer[2]) << 8) | static_cast<unsigned char>(echoBuffer[3]);
 			//error: "Bad block number"
 			if (rec_block_num != (curr_data_block + 1)) {
 				//send Error "Bad block number" in the wright format: TODO
 			}
+			else //valid data block, send ACK
+			{
+				unsigned int ACK_Samp_Content = 0x0;
+				ACK_Samp_Content += ACK_OP;
+				ACK_Samp_Content = ACK_Samp_Content << (sizeof(unsigned short) * 8);
+				ACK_Samp_Content += ACK_block_num;
+				if (sendto(sock, &ACK_Samp_Content, sizeof(unsigned int), 0, (struct sockaddr*)&currClntAddr,
+					sizeof(currClntAddr)) {
+					
+					perror("TTFTP_ERROR: sendto() failed");
+					exit(1);
+				}
+				curr_data_block++;
+				ACK_block_num++;
+			}
 		}
 
 
-
-		
-
-		/* Send received datagram back to the client */
-		//TODO: send ACK{0..1..2} to client
-		if (sendto(sock, echoBuffer, recvMsgSize, 0,
-			(struct sockaddr*)&echoClntAddr,
-			sizeof(echoClntAddr)) != recvMsgSize)
-			error("sendto() sent a different number of bytes than expected");
-	}
 	/* NOT REACHED */
 }
 
