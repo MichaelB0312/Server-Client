@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
 
 	int WRQ_flag = 0; int ACK_flag = 0;
 	int SessionEnd_flag = 0; // raise flag when session has terminated normally (without errors and client
-							//  send data length less than 512 bytes
+	//  send data length less than 512 bytes
 	int recvMsgSize; /* Size of received message */
 
 	/* Create socket for sending/receiving datagrams */
@@ -67,13 +67,16 @@ int main(int argc, char* argv[]) {
 	echoServAddr.sin_port = htons(echoServPort);
 	/* Bind to the local address */
 	if (bind(sock, (struct sockaddr*)&echoServAddr,
-		sizeof(echoServAddr)) < 0)
-		error("bind() failed");
+		sizeof(echoServAddr)) < 0) {
+		perror("TTFTP_ERROR: bind() failed");
+		exit(1);
+	}
 
 	struct sockaddr_in currClntAddr;
 	int fail_cnt = 1;
 	unsigned short curr_data_block = 0x0;
 	unsigned short ACK_block_num = 0x0;
+	string filename;
 
 	/* START RUNNING THE SERVER */
 	for (;;) { /* Run forever */
@@ -129,7 +132,6 @@ int main(int argc, char* argv[]) {
 			currClntAddr.sin_addr.s_addr = echoClntAddr.sin_addr.s_addr;
 			currClntAddr.sin_port = ntohs(echoClntAddr.sin_port);
 			
-			string filename;
 
 			for (auto i = 2 * sizeof(short); *i != '\0'; ++i)){
 				filename += echoBuffer[i]
@@ -172,6 +174,8 @@ int main(int argc, char* argv[]) {
 				ACK_Samp_Content += ACK_OP;
 				ACK_Samp_Content = ACK_Samp_Content << (sizeof(unsigned short) * 8);
 				ACK_Samp_Content += ACK_block_num;
+				// TODO: write data content to filename. I dont know what is the issue with modulo 512.
+				// how we know the size of the file in advance??
 				if (sendto(sock, &ACK_Samp_Content, sizeof(unsigned int), 0, (struct sockaddr*)&currClntAddr,
 					sizeof(currClntAddr)) {
 					
@@ -185,7 +189,7 @@ int main(int argc, char* argv[]) {
 
 
 	/* NOT REACHED */
-}
+	}
 
 ///////********* END OF TEMPLATE FOR UDP SERVER **************///////////
 ///////////////////////////////////////////////////////////////////////////////////////////
