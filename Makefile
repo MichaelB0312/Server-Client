@@ -6,7 +6,7 @@ CFLAGS = -std=c++11 -Wall -g -pedantic -DNDEBUG -pthread
 # CFLAGS = -std=c++11 -Wall -Werror -pedantic -pedantic-errors -DNDEBUG
 # CFLAGS = -g -Wall
 CCLINK = $(CC)
-OBJS = ttftps.o
+OBJS = ttftps.o connections.o
 RM = rm -f
 ZIP_FILENAME = 316124221_206013914.zip
 LOG_FILENAME = log.txt
