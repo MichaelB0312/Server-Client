@@ -1,0 +1,4 @@
+#ifndef _CONNECTIONS_H
+#define _CONNECTIONS_H
+
+#endif // _CONNECTIONS_H
