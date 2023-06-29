@@ -21,6 +21,7 @@ using namespace std;
 ///////********* THIS A TEMPLATE FOR UDP SERVER FROM TUT.9 P.56-58 **************///////////
 ///////////////////////////////////////////////////////////////////////////////////////////
 #define ECHOMAX 516 /* Longest string to echo */
+#define HEADER_SIZE 4
 
 int main(int argc, char* argv[]) {
 	int sock; /* Socket */
@@ -139,7 +140,7 @@ int main(int argc, char* argv[]) {
 			ifstream file(filename);
 			if (!file.good()) { //file doesn't exist, new file has arrived!
 				WRQ_flag = 1;
-				ofstream file(fileName); //add file to current cd
+				ofstream file(fileName, std::ios::app);); //add file to current cd
 			}
 			else //send Error "File already exist" in the wright format: TODO
 			
@@ -174,8 +175,7 @@ int main(int argc, char* argv[]) {
 				ACK_Samp_Content += ACK_OP;
 				ACK_Samp_Content = ACK_Samp_Content << (sizeof(unsigned short) * 8);
 				ACK_Samp_Content += ACK_block_num;
-				// TODO: write data content to filename. I dont know what is the issue with modulo 512.
-				// how we know the size of the file in advance??
+				
 				if (sendto(sock, &ACK_Samp_Content, sizeof(unsigned int), 0, (struct sockaddr*)&currClntAddr,
 					sizeof(currClntAddr)) {
 					
@@ -184,6 +184,20 @@ int main(int argc, char* argv[]) {
 				}
 				curr_data_block++;
 				ACK_block_num++;
+
+				// TODO: write data content to filename. I dont know what is the issue with modulo 512???
+				if (recvMsgSize < (ECHOMAX - HEADER_SIZE)) { //end of session
+					SessionEnd_flag = 1;
+					memset(&currClntAddr, 0, sizeof(currClntAddr)); //prepare to a new client
+					WRQ_flag = 0;
+					ACK_block_num = 0x0;
+					curr_data_block = 0x0;
+				}
+
+				//insert data packet content:
+				char* content = echoBuffer + 4; //do not include header
+				file << content;
+
 			}
 		}
 
