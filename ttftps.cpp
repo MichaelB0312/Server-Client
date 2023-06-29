@@ -9,70 +9,53 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fstream>
-#include <iostream>
 #include <string.h>
+
+#include "packets.h"
+#include "connections.h"
 
 using namespace std;
 
-#define WRQ_OP 0x02
-#define ACK_OP 0x04
-#define DATA_OP 0x03
+enum prog_args {
+    PROG_ARGS_PROGNAME = 0,
+    PROG_ARGS_PORT,
+    PROG_ARGS_TIMEOUT,
+    PROG_ARGS_MAX_RESENDS,
+    PROG_ARGS_LEN
+};
 
-
-///////********* THIS A TEMPLATE FOR UDP SERVER FROM TUT.9 P.56-58 **************///////////
-///////////////////////////////////////////////////////////////////////////////////////////
-#define ECHOMAX 516 /* Longest string to echo */
-#define HEADER_SIZE 4
 
 int main(int argc, char* argv[]) {
-    int sock; /* Socket */
-    struct sockaddr_in echoServAddr; /* Local address */
-    struct sockaddr_in echoClntAddr; /* Client address */
-    unsigned int cliAddrLen; /* Length of incoming message */
-    char echoBuffer[ECHOMAX]; /* Buffer for echo string */
 
-    /* Recieve Parameters*/
-    if (argc < 4) {
+    // Parse arguments
+    if (argc < PROG_ARGS_LEN) {
         cerr << "TTFTP_ERROR: illegal arguments" << endl;
         exit(1);
     }
-    if ((atoi(argv[1]) > USHRT_MAX || atoi(argv[1]) < 0) ||
-        (atoi(argv[2]) > USHRT_MAX || atoi(argv[2]) < 0) ||
-        (atoi(argv[3]) > USHRT_MAX || atoi(argv[3]) < 0)) {
+
+    unsigned short port_num = atoi(argv[PROG_ARGS_PORT]);
+    unsigned short timeout = atoi(argv[PROG_ARGS_TIMEOUT]);
+    unsigned short max_num_of_resends = atoi(argv[PROG_ARGS_MAX_RESENDS]);
+
+    // Validate arguments are valid
+    if ((port_num > USHRT_MAX || port_num <= 0) ||
+        (timeout > USHRT_MAX || timeout <= 0) ||
+        (max_num_of_resends > USHRT_MAX || max_num_of_resends <= 0)) {
         cerr << "TTFTP_ERROR: illegal arguments" << endl;
         exit(1);
     }
-    unsigned short echoServPort = atoi(argv[1]); /* Server port */
-    unsigned short timeout = atoi(argv[2]);
-    unsigned short max_num_of_resends = atoi(argv[3]);
 
-    int WRQ_flag = 0; int ACK_flag = 0;
-    int SessionEnd_flag = 0; // raise flag when session has terminated normally (without errors and client
-    //  send data length less than 512 bytes
-    int recvMsgSize; /* Size of received message */
+    // Open listening socket
+    connection server_connection;
+    server_connection.init_connection(port_num, timeout, max_num_of_resends);
 
-    /* Create socket for sending/receiving datagrams */
-    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock < 0) {
-        perror("TTFTP_ERROR: socket() failed");
-        exit(1);
+    // Serve clients forever
+    for (;;) {
+        // Read and process next packet
+        server_connection.handle_packet();
     }
 
 
-    /* Construct local address structure */
-    /* Zero out structure */
-    memset(&echoServAddr, 0, sizeof(echoServAddr));
-    /* Internet address family */
-    echoServAddr.sin_family = AF_INET;
-    /* Any incoming interface */
-    echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    /* Local port */
-    echoServAddr.sin_port = htons(echoServPort);
-    /* Bind to the local address */
-    if (bind(sock, (struct sockaddr*)&echoServAddr, sizeof(echoServAddr)) < 0) {
-        perror("TTFTP_ERROR: bind() failed");
-        exit(1);
-    }
 
     // struct sockaddr_in currClntAddr;
     // int fail_cnt = 1;

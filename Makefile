@@ -24,7 +24,7 @@ connections.o: connections.cpp
 
 # Cleaning old files before new make
 clean:
-	$(RM) $(TARGET) *.o *~ "#"* core.* Bank
+	$(RM) $(TARGET) *.o *~ "#"* core.* ttftps
 clean_zip:
 	$(RM) $(ZIP_FILENAME)
 clean_log:

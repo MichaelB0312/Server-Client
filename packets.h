@@ -8,6 +8,14 @@
 
 using namespace std;
 
+enum packet_opcode {
+    WRQ_OP = 0x02,
+    DATA_OP = 0x03,
+    ACK_OP = 0x04,
+};
+
+#define PACKET_HEADER_SIZE 4
+
 // typedef struct {
 // 	unsigned short opcode;
 // 	string filename;
