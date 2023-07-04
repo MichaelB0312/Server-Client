@@ -69,6 +69,14 @@ void connection::handle_packet()
         return;
     }
 
+    // fill this time as the last valid packet time and reset resend counter
+    // (as if this packet is invalid, we will reset the connection anyway, as this is the correct client)
+    this->current_resends = 0;
+    if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
+        perror("TTFTP_ERROR: clock_gettime() failed"); 
+        exit(1);
+    }
+
     // Get opcode of packet
     unsigned short packet_opcode = ntohs(((struct general_packet*)(this->packet_buffer))->opcode);
     cout << "DEBUG: got opcode " << packet_opcode << endl; // TODO: Remove me
@@ -178,6 +186,10 @@ void connection::handle_timeout()
             exit(1);
         }
     } else {
+        // add to resend count
+        this->current_resends += 1;
+        cout << "DEBUG: resending block " << this->current_block << " for " << this->current_resends << " time" << endl; // TODO: Remove me
+
         // reset timeout
         if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
             perror("TTFTP_ERROR: clock_gettime() failed"); 
@@ -196,13 +208,6 @@ void connection::handle_timeout()
 void connection::handle_write_packet()
 {
     cout << "DEBUG: got write request" << endl; // TODO: Remove me
-
-    // fill this time as the last valid data packet
-    // (as if this packet is invalid, we will reset the connection anyway, as this is the correct client)
-    if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
-        perror("TTFTP_ERROR: clock_gettime() failed"); 
-        exit(1);
-    }
 
     // check if we already have an ongoing connection
     if (this->has_ongoing_client) {
