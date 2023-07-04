@@ -27,6 +27,7 @@ enum error_packet_codes {
 
 #define ERROR_MESSAGE_FILE_EXISTS "File already exists"
 #define ERROR_MESSAGE_UNEXPECTED_PACKET "Unexpected packet"
+#define ERROR_MESSAGE_MAX_RESEND "Abandoning file transmission"
 
 struct general_packet {
     unsigned short opcode;

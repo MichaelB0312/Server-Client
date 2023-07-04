@@ -157,8 +157,40 @@ bool connection::get_next_packet()
 
 void connection::handle_timeout()
 {
-    // TODO: Fill this!
     cout << "DEBUG: got timeout" << endl; // TODO: Remove me
+
+    // Check if max resends reached
+    if (this->current_resends >= this->max_resends) {
+        // drop the connection
+        this->has_ongoing_client = false;
+        
+        // notify client we are killing the connection
+        ERROR_packet max_resends_packet = {htons(ERROR_OP), htons(ERROR_CODE_MAX_RESEND), ERROR_MESSAGE_MAX_RESEND};
+        if (-1 == sendto(this->socket_fd, &max_resends_packet, sizeof(ERROR_MESSAGE_MAX_RESEND) + ERROR_PACKET_HEADER_SIZE, 0, (struct sockaddr*)&this->ongoing_client_address, sizeof(this->ongoing_client_address))) {
+            perror("TTFTP_ERROR: sendto() failed");
+            exit(1);
+        }
+
+        // close and remove current file
+        this->current_file.close();
+        if (0 != remove(this->filename)) {
+            perror("TTFTP_ERROR: remove() failed");
+            exit(1);
+        }
+    } else {
+        // reset timeout
+        if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
+            perror("TTFTP_ERROR: clock_gettime() failed"); 
+            exit(1);
+        }
+
+        // resend ack packet
+        ACK_packet ack_packet = {htons(ACK_OP), htons(this->current_block)};
+        if (-1 == sendto(this->socket_fd, &ack_packet, ACK_PACKET_SIZE, 0, (struct sockaddr*)&this->ongoing_client_address, sizeof(this->ongoing_client_address))) {
+            perror("TTFTP_ERROR: sendto() failed");
+            exit(1);
+        }
+    }
 }
 
 void connection::handle_write_packet()
@@ -184,6 +216,7 @@ void connection::handle_write_packet()
     memcpy(&this->ongoing_client_address, &this->current_client_address, sizeof(this->current_client_address));
     this->has_ongoing_client = true;
     this->current_resends = 0;
+    this->current_block = 0;
 
     // get filename
     strncpy(this->filename, ((struct WRQ_packet*)(&this->packet_buffer))->strings, MAX_PACKET_SIZE-1);
@@ -209,7 +242,7 @@ void connection::handle_write_packet()
     }
 
     // send ack to client
-    ACK_packet ack_packet = {htons(ACK_OP), htons(0)};
+    ACK_packet ack_packet = {htons(ACK_OP), htons(this->current_block)};
     if (-1 == sendto(this->socket_fd, &ack_packet, ACK_PACKET_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
         perror("TTFTP_ERROR: sendto() failed");
         exit(1);
