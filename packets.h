@@ -30,6 +30,7 @@ enum error_packet_codes {
 #define ERROR_MESSAGE_UNEXPECTED_PACKET "Unexpected packet"
 #define ERROR_MESSAGE_MAX_RESEND "Abandoning file transmission"
 #define ERROR_MESSAGE_BAD_BLOCK "Bad block number"
+#define ERROR_MESSAGE_UNKNOWN_USER "Unknown user"
 
 struct general_packet {
     unsigned short opcode;

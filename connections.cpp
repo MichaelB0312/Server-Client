@@ -295,6 +295,17 @@ void connection::handle_data_packet()
 {
     cout << "DEBUG: got data request" << endl; // TODO: Remove me
 
+    // check we already started writing
+    if (!this->has_ongoing_client) {
+        // send unexpected packet to current client
+        ERROR_packet unknown_user_packet = {htons(ERROR_OP), htons(ERROR_CODE_UNKNOWN_USER), ERROR_MESSAGE_UNKNOWN_USER};
+        if (-1 == sendto(this->socket_fd, &unknown_user_packet, sizeof(ERROR_MESSAGE_UNKNOWN_USER) + ERROR_PACKET_HEADER_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
+            perror("TTFTP_ERROR: sendto() failed");
+            exit(1);
+        }
+        return;
+    }
+
     // Check block number
     unsigned short next_block = ntohs(((struct DATA_packet*)(this->packet_buffer))->block_number);
     if (1 + this->current_block != next_block) {
