@@ -106,7 +106,7 @@ bool connection::get_next_packet()
         }
         // subtract current time from last packet time plus timeout
         select_timeout_from_last_valid_packet.tv_sec = (time_t)this->max_wait_timeout + this->last_valid_packet_time.tv_sec - current_time.tv_sec;
-        select_timeout_from_last_valid_packet.tv_usec = this->last_valid_packet_time.tv_nsec - current_time.tv_nsec;
+        select_timeout_from_last_valid_packet.tv_usec = (this->last_valid_packet_time.tv_nsec - current_time.tv_nsec) / 1000;
         if (0 > select_timeout_from_last_valid_packet.tv_usec) {
             // convert one second to usec to deal with negative usec value
             select_timeout_from_last_valid_packet.tv_usec += 1000000;
@@ -115,11 +115,14 @@ bool connection::get_next_packet()
         if (select_timeout_from_last_valid_packet.tv_sec < 0) {
             // timeout already passed, and we didn't call select yet
             // (meaning the timeout passed between our last call to select and now)
+            cout << "DEBUG: timeout passed since last select" << endl; // TODO: Remove me
             return false;
         }
         select_timer = &select_timeout_from_last_valid_packet;
+        cout << "DEBUG: waiting with timeout of " << select_timeout_from_last_valid_packet.tv_sec << " seconds " << select_timeout_from_last_valid_packet.tv_usec << " usec" << endl; // TODO: Remove me
     } else {
         select_timer = NULL;
+        cout << "DEBUG: waiting forever" << endl; // TODO: Remove me
     }
 
     // select on sever socket
@@ -150,6 +153,7 @@ bool connection::get_next_packet()
     cout << "DEBUG: got a packet from " << ntohs(this->current_client_address.sin_port) << endl; // TODO: Remove me
     return true;
 }
+
 
 void connection::handle_timeout()
 {
@@ -190,39 +194,26 @@ void connection::handle_write_packet()
     ifstream intput_file (this->filename);
     if (intput_file.good()) {
         // file exists. We return error and close connection.
+        intput_file.close();
         this->close_connection_file_exists();
         return;
     }
 
-    // TODO: Handle client starting to write (open file and handle ). Change following code to do what's needed.
-          
-    //     // check if it's WRQ packet:
-    //     if (echoBuffer[0] == WRQ_OP && !WRQ_flag) { //first WRQ packet
+    // open file for writing
+    this->current_file.open(this->filename, ofstream::out | ofstream::binary | ofstream::ate);
+    // cout << "DEBUG: file should now be open: " << this->filename << endl; // TODO: Remove me
+    if (!this->current_file.good()) {
+        // error opening the file
+        perror("TTFTP_ERROR: open() failed");
+        exit(1);
+    }
 
-    //         currClntAddr.sin_addr.s_addr = echoClntAddr.sin_addr.s_addr;
-    //         currClntAddr.sin_port = ntohs(echoClntAddr.sin_port);
-            
-
-    //         for (auto i = 2 * sizeof(short); *i != '\0'; ++i)){
-    //             filename += echoBuffer[i]
-    //         }
-    //         ifstream file(filename);
-    //         if (!file.good()) { //file doesn't exist, new file has arrived!
-    //             WRQ_flag = 1;
-    //             ofstream file(fileName, std::ios::app);); //add file to current cd
-    //         }
-    //         else //send Error "File already exist" in the wright format: TODO
-            
-    //     }
-
-    //     //send Error "Unexpected packet" in the wright format: TODO
-    //     if (!SessionEnd_flag && ((echoBuffer[0] == WRQ_OP) ||
-    //                             (currClntAddr.sin_port != ntohs(echoClntAddr.sin_port)
-    //                             || (currClntAddr.sin_addr.s_addr != echoClntAddr.sin_addr.s_addr)) {
-
-    //         //send Error "Unexpected packet" in the wright format: TODO
-    //     }
-
+    // send ack to client
+    ACK_packet ack_packet = {htons(ACK_OP), htons(0)};
+    if (-1 == sendto(this->socket_fd, &ack_packet, ACK_PACKET_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
+        perror("TTFTP_ERROR: sendto() failed");
+        exit(1);
+    }
 }
 
 void connection::close_connection_file_exists()
@@ -246,7 +237,12 @@ void connection::cancel_current_connection()
     // notify client we are killing the connection
     this->send_unexpected_packet();
 
-    // TODO: Add removing the file we started to write for this client
+    // close and remove current file
+    this->current_file.close();
+    if (0 != remove(this->filename)) {
+        perror("TTFTP_ERROR: remove() failed");
+        exit(1);
+    }
 }
 
 void connection::handle_data_packet()
@@ -300,10 +296,12 @@ void connection::handle_data_packet()
 
 void connection::send_unexpected_packet()
 {
-    // TODO: Fill this!
     cout << "DEBUG: sending unexpected packet error packet" << endl; // TODO: Remove me
 
-    // build the unexpected packet error packet
-
-    // send packet to current client
+    // send unexpected packet to current client
+    ERROR_packet file_exists_packet = {htons(ERROR_OP), htons(ERROR_CODE_UNEXPECTED_PACKET), ERROR_MESSAGE_UNEXPECTED_PACKET};
+    if (-1 == sendto(this->socket_fd, &file_exists_packet, sizeof(ERROR_MESSAGE_UNEXPECTED_PACKET) + ERROR_PACKET_HEADER_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
+        perror("TTFTP_ERROR: sendto() failed");
+        exit(1);
+    }
 }

@@ -15,6 +15,7 @@ typedef struct connection {
     char packet_buffer[MAX_PACKET_SIZE];
     int current_packet_length;
     struct timespec last_valid_packet_time;
+    ofstream current_file;
 
     // external functions
     void init_connection(unsigned short port_num, unsigned short timeout, unsigned short max_num_of_resends);
