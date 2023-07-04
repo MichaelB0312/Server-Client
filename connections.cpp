@@ -181,6 +181,10 @@ void connection::handle_timeout()
 
         // close and remove current file
         this->current_file.close();
+        if (!this->current_file.good()) {
+            perror("TTFTP_ERROR: close() failed");
+            exit(1);
+        }
         if (0 != remove(this->filename)) {
             perror("TTFTP_ERROR: remove() failed");
             exit(1);
@@ -224,7 +228,7 @@ void connection::handle_write_packet()
     this->current_block = 0;
 
     // get filename
-    strncpy(this->filename, ((struct WRQ_packet*)(&this->packet_buffer))->strings, MAX_PACKET_SIZE-1);
+    strncpy(this->filename, ((struct WRQ_packet*)(this->packet_buffer))->strings, MAX_PACKET_SIZE-1);
     this->filename[MAX_PACKET_SIZE-1] = '\0';
     cout << "DEBUG: requested file to create: " << this->filename << endl; // TODO: Remove me
 
@@ -277,6 +281,10 @@ void connection::cancel_current_connection()
 
     // close and remove current file
     this->current_file.close();
+    if (!this->current_file.good()) {
+        perror("TTFTP_ERROR: close() failed");
+        exit(1);
+    }
     if (0 != remove(this->filename)) {
         perror("TTFTP_ERROR: remove() failed");
         exit(1);
@@ -285,52 +293,70 @@ void connection::cancel_current_connection()
 
 void connection::handle_data_packet()
 {
-    // TODO: Fill this!
     cout << "DEBUG: got data request" << endl; // TODO: Remove me
 
-    // TODO: change following code to do what's needed
+    // Check block number
+    unsigned short next_block = ntohs(((struct DATA_packet*)(this->packet_buffer))->block_number);
+    if (1 + this->current_block != next_block) {
+        // drop the connection
+        this->has_ongoing_client = false;
+        
+        // notify client we are killing the connection
+        ERROR_packet bad_block_packet = {htons(ERROR_OP), htons(ERROR_CODE_BAD_BLOCK), ERROR_MESSAGE_BAD_BLOCK};
+        if (-1 == sendto(this->socket_fd, &bad_block_packet, sizeof(ERROR_MESSAGE_BAD_BLOCK) + ERROR_PACKET_HEADER_SIZE, 0, (struct sockaddr*)&this->ongoing_client_address, sizeof(this->ongoing_client_address))) {
+            perror("TTFTP_ERROR: sendto() failed");
+            exit(1);
+        }
 
-//     /* Response to DATA packet */
-//     if (echoBuffer[0] == DATA_OP) {
-//         // parse DATA packet block number
-//         rec_block_num = (static_cast<unsigned char>(echoBuffer[2]) << 8) | static_cast<unsigned char>(echoBuffer[3]);
-//         //error: "Bad block number"
-//         if (rec_block_num != (curr_data_block + 1)) {
-//             //send Error "Bad block number" in the wright format: TODO
-//         }
-//         else //valid data block, send ACK
-//         {
-//             unsigned int ACK_Samp_Content = 0x0;
-//             ACK_Samp_Content += ACK_OP;
-//             ACK_Samp_Content = ACK_Samp_Content << (sizeof(unsigned short) * 8);
-//             ACK_Samp_Content += ACK_block_num;
-            
-//             if (sendto(sock, &ACK_Samp_Content, sizeof(unsigned int), 0, (struct sockaddr*)&currClntAddr,
-//                 sizeof(currClntAddr)) {
-                
-//                 perror("TTFTP_ERROR: sendto() failed");
-//                 exit(1);
-//             }
-//             curr_data_block++;
-//             ACK_block_num++;
+        // close and remove current file
+        this->current_file.close();
+        if (!this->current_file.good()) {
+            perror("TTFTP_ERROR: close() failed");
+            exit(1);
+        }
+        if (0 != remove(this->filename)) {
+            perror("TTFTP_ERROR: remove() failed");
+            exit(1);
+        }
 
-//             // TODO: write data content to filename. I dont know what is the issue with modulo 512???
-//             if (recvMsgSize < (ECHOMAX - HEADER_SIZE)) { //end of session
-//                 SessionEnd_flag = 1;
-//                 memset(&currClntAddr, 0, sizeof(currClntAddr)); //prepare to a new client
-//                 WRQ_flag = 0;
-//                 ACK_block_num = 0x0;
-//                 curr_data_block = 0x0;
-//             }
+        // return to stop processing this data block
+        return;
+    }
 
-//             //insert data packet content:
-//             char* content = echoBuffer + 4; //do not include header
-//             file << content;
+    // move to next data block
+    this->current_block = next_block;
 
-//         }
-//     }
+    // send ack to client
+    ACK_packet ack_packet = {htons(ACK_OP), htons(this->current_block)};
+    if (-1 == sendto(this->socket_fd, &ack_packet, ACK_PACKET_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
+        perror("TTFTP_ERROR: sendto() failed");
+        exit(1);
+    }
+
+    // write data to file
+    unsigned short data_length = this->current_packet_length - DATA_PACKET_HEADER_SIZE;
+    if (0 != data_length) {
+        this->current_file.write(((struct DATA_packet*)(this->packet_buffer))->file_data, data_length);
+        if (!this->current_file.good()) {
+            perror("TTFTP_ERROR: write() failed");
+            exit(1);
+        }
+        this->current_file.flush();
+    }
+
+    // close file and connection if this is the last data part
+    if (MAX_PACKET_SIZE - DATA_PACKET_HEADER_SIZE != data_length) {
+        // Close file
+        this->current_file.close();
+        if (!this->current_file.good()) {
+            perror("TTFTP_ERROR: close() failed");
+            exit(1);
+        }
+
+        // close connection
+        this->has_ongoing_client = false;
+    }
 }
-
 
 void connection::send_unexpected_packet()
 {

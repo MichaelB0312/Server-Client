@@ -7,6 +7,7 @@
 #define MAX_PACKET_SIZE 516
 #define ERROR_PACKET_HEADER_SIZE 4
 #define ACK_PACKET_SIZE 4
+#define DATA_PACKET_HEADER_SIZE 4
 
 using namespace std;
 
@@ -28,6 +29,7 @@ enum error_packet_codes {
 #define ERROR_MESSAGE_FILE_EXISTS "File already exists"
 #define ERROR_MESSAGE_UNEXPECTED_PACKET "Unexpected packet"
 #define ERROR_MESSAGE_MAX_RESEND "Abandoning file transmission"
+#define ERROR_MESSAGE_BAD_BLOCK "Bad block number"
 
 struct general_packet {
     unsigned short opcode;
