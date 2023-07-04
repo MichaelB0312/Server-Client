@@ -11,8 +11,10 @@ typedef struct connection {
     struct sockaddr_in current_client_address;
     bool has_ongoing_client;
     struct sockaddr_in ongoing_client_address;
+    char filename[MAX_PACKET_SIZE];
     char packet_buffer[MAX_PACKET_SIZE];
     int current_packet_length;
+    struct timespec last_valid_packet_time;
 
     // external functions
     void init_connection(unsigned short port_num, unsigned short timeout, unsigned short max_num_of_resends);
@@ -25,6 +27,7 @@ typedef struct connection {
     void handle_write_packet();
     void handle_data_packet();
     void cancel_current_connection();
+    void close_connection_file_exists();
 }connection;
 
 

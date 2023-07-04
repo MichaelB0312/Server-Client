@@ -5,6 +5,7 @@
 
 /* max packet size our server supports */
 #define MAX_PACKET_SIZE 516
+#define ERROR_PACKET_HEADER_SIZE 4
 
 using namespace std;
 
@@ -14,6 +15,16 @@ enum packet_opcode {
     ACK_OP = 0x04,
     ERROR_OP = 0x05,
 };
+
+enum error_packet_codes {
+    ERROR_CODE_FILE_EXISTS = 6,
+    ERROR_CODE_UNKNOWN_USER = 7,
+    ERROR_CODE_UNEXPECTED_PACKET = 4,
+    ERROR_CODE_BAD_BLOCK = 0,
+    ERROR_CODE_MAX_RESEND = 0,
+};
+
+#define ERROR_MESSAGE_FILE_EXISTS "File already exists"
 
 struct general_packet {
     unsigned short opcode;
@@ -29,6 +40,12 @@ struct DATA_packet {
     unsigned short opcode;
     unsigned short block_number;
     char file_data[MAX_PACKET_SIZE - sizeof(opcode) - sizeof(block_number)];
+} __attribute__((packed));
+
+struct ERROR_packet {
+    unsigned short opcode;
+    unsigned short error_code;
+    char error_string[MAX_PACKET_SIZE - sizeof(opcode) - sizeof(error_code)];
 } __attribute__((packed));
 
 // typedef struct {

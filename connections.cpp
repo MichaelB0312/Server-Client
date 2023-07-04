@@ -5,8 +5,9 @@
 #include <netinet/in.h>
 #include <limits.h>
 #include <iostream>
+#include <fstream>
 #include <string.h>
-#include <iostream>
+#include <time.h>
 #include "connections.h"
 
 #define WRQ_OP 0x02
@@ -90,13 +91,33 @@ void connection::handle_packet()
 
 bool connection::get_next_packet()
 {
-    struct timeval timer_with_client;
-    timer_with_client.tv_sec = (time_t)this->max_wait_timeout;
-    timer_with_client.tv_usec = 0;
     struct timeval * select_timer;
-    // choose if we need to select forever or only for 3 seconds, based on server state
+    struct timeval select_timeout_from_last_valid_packet;
+
+
+    // choose if we need to select forever or only for remainder of timeout, based on server state
     if (this->has_ongoing_client) {
-        select_timer = &timer_with_client;
+        // calculate time to select for
+        // get current time
+        struct timespec current_time;
+        if (-1 == clock_gettime(CLOCK_MONOTONIC, &current_time)) {
+            perror("TTFTP_ERROR: clock_gettime() failed"); 
+            exit(1);
+        }
+        // subtract current time from last packet time plus timeout
+        select_timeout_from_last_valid_packet.tv_sec = (time_t)this->max_wait_timeout + this->last_valid_packet_time.tv_sec - current_time.tv_sec;
+        select_timeout_from_last_valid_packet.tv_usec = this->last_valid_packet_time.tv_nsec - current_time.tv_nsec;
+        if (0 > select_timeout_from_last_valid_packet.tv_usec) {
+            // convert one second to usec to deal with negative usec value
+            select_timeout_from_last_valid_packet.tv_usec += 1000000;
+            select_timeout_from_last_valid_packet.tv_sec -= 1;
+        }
+        if (select_timeout_from_last_valid_packet.tv_sec < 0) {
+            // timeout already passed, and we didn't call select yet
+            // (meaning the timeout passed between our last call to select and now)
+            return false;
+        }
+        select_timer = &select_timeout_from_last_valid_packet;
     } else {
         select_timer = NULL;
     }
@@ -140,11 +161,36 @@ void connection::handle_write_packet()
 {
     cout << "DEBUG: got write request" << endl; // TODO: Remove me
 
+    // fill this time as the last valid data packet
+    // (as if this packet is invalid, we will reset the connection anyway, as this is the correct client)
+    if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
+        perror("TTFTP_ERROR: clock_gettime() failed"); 
+        exit(1);
+    }
+
     // check if we already have an ongoing connection
     if (this->has_ongoing_client) {
         // Should't get write request from client if we already have a connection.
         // Kill the connection
         this->cancel_current_connection();
+        return;
+    }
+
+    // save current client as ongoing client
+    memcpy(&this->ongoing_client_address, &this->current_client_address, sizeof(this->current_client_address));
+    this->has_ongoing_client = true;
+    this->current_resends = 0;
+
+    // get filename
+    strncpy(this->filename, ((struct WRQ_packet*)(&this->packet_buffer))->strings, MAX_PACKET_SIZE-1);
+    this->filename[MAX_PACKET_SIZE-1] = '\0';
+    cout << "DEBUG: requested file to create: " << this->filename << endl; // TODO: Remove me
+
+    // check if file already exists
+    ifstream intput_file (this->filename);
+    if (intput_file.good()) {
+        // file exists. We return error and close connection.
+        this->close_connection_file_exists();
         return;
     }
 
@@ -179,14 +225,26 @@ void connection::handle_write_packet()
 
 }
 
-void connection::cancel_current_connection()
+void connection::close_connection_file_exists()
 {
-    // notify client we are killing the connection
-    this->send_unexpected_packet();
     // drop the connection
     this->has_ongoing_client = false;
-    // reset resend retries
-    this->current_resends = 0;
+
+    // notify client file exists
+    ERROR_packet file_exists_packet = {htons(ERROR_OP), htons(ERROR_CODE_FILE_EXISTS), ERROR_MESSAGE_FILE_EXISTS};
+    if (-1 == sendto(this->socket_fd, &file_exists_packet, sizeof(ERROR_MESSAGE_FILE_EXISTS) + ERROR_PACKET_HEADER_SIZE, 0, (struct sockaddr*)&this->current_client_address, sizeof(this->current_client_address))) {
+        perror("TTFTP_ERROR: sendto() failed");
+        exit(1);
+    }
+}
+
+void connection::cancel_current_connection()
+{
+    // drop the connection
+    this->has_ongoing_client = false;
+    
+    // notify client we are killing the connection
+    this->send_unexpected_packet();
 
     // TODO: Add removing the file we started to write for this client
 }
