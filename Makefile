@@ -6,7 +6,7 @@ CFLAGS = -std=c++11 -Wall -g -pedantic -DNDEBUG -pthread
 # CFLAGS = -std=c++11 -Wall -Werror -pedantic -pedantic-errors -DNDEBUG
 # CFLAGS = -g -Wall
 CCLINK = $(CC)
-OBJS = ttftps.o clients.o errors.o
+OBJS = ttftps.o connections.o
 RM = rm -f
 ZIP_FILENAME = 316124221_206013914.zip
 LOG_FILENAME = log.txt
@@ -19,14 +19,12 @@ ttftps: $(OBJS)
 # Creating the object files
 ttftps.o: ttftps.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
-clients.o: clients.cpp
-	$(CC) -c $(CFLAGS) $< -o $@
-errors.o: errors.cpp
+connections.o: connections.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
 
 # Cleaning old files before new make
 clean:
-	$(RM) $(TARGET) *.o *~ "#"* core.* Bank
+	$(RM) $(TARGET) *.o *~ "#"* core.* ttftps
 clean_zip:
 	$(RM) $(ZIP_FILENAME)
 clean_log:
