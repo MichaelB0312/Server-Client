@@ -59,24 +59,5 @@ struct ERROR_packet {
     char error_string[MAX_PACKET_SIZE - sizeof(opcode) - sizeof(error_code)];
 } __attribute__((packed));
 
-// typedef struct {
-// 	unsigned short opcode;
-// 	string filename;
-
-
-// } WRQpacket
-
-// /*! msg_type: Recognify packet type and raise an appropiate flag
-//   \param[in] 
-//   \param[in]
-// */
-// int msg_type()
-
-
-// /* Recognize DATA packet*/
-
-
-
-
 
 #endif // _PACKETS_H

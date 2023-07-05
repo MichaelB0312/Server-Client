@@ -79,7 +79,6 @@ void connection::handle_packet()
 
     // Get opcode of packet
     unsigned short packet_opcode = ntohs(((struct general_packet*)(this->packet_buffer))->opcode);
-    cout << "DEBUG: got opcode " << packet_opcode << endl; // TODO: Remove me
 
     // Handle packet based on server state
     switch (packet_opcode)
@@ -123,14 +122,11 @@ bool connection::get_next_packet()
         if (select_timeout_from_last_valid_packet.tv_sec < 0) {
             // timeout already passed, and we didn't call select yet
             // (meaning the timeout passed between our last call to select and now)
-            cout << "DEBUG: timeout passed since last select" << endl; // TODO: Remove me
             return false;
         }
         select_timer = &select_timeout_from_last_valid_packet;
-        cout << "DEBUG: waiting with timeout of " << select_timeout_from_last_valid_packet.tv_sec << " seconds " << select_timeout_from_last_valid_packet.tv_usec << " usec" << endl; // TODO: Remove me
     } else {
         select_timer = NULL;
-        cout << "DEBUG: waiting forever" << endl; // TODO: Remove me
     }
 
     // select on sever socket
@@ -158,14 +154,12 @@ bool connection::get_next_packet()
         exit(1);
     }
 
-    cout << "DEBUG: got a packet from " << ntohs(this->current_client_address.sin_port) << endl; // TODO: Remove me
     return true;
 }
 
 
 void connection::handle_timeout()
 {
-    cout << "DEBUG: got timeout" << endl; // TODO: Remove me
 
     // Check if max resends reached
     if (this->current_resends >= this->max_resends) {
@@ -192,7 +186,6 @@ void connection::handle_timeout()
     } else {
         // add to resend count
         this->current_resends += 1;
-        cout << "DEBUG: resending block " << this->current_block << " for " << this->current_resends << " time" << endl; // TODO: Remove me
 
         // reset timeout
         if (-1 == clock_gettime(CLOCK_MONOTONIC, &this->last_valid_packet_time)) {
@@ -211,7 +204,6 @@ void connection::handle_timeout()
 
 void connection::handle_write_packet()
 {
-    cout << "DEBUG: got write request" << endl; // TODO: Remove me
 
     // check if we already have an ongoing connection
     if (this->has_ongoing_client) {
@@ -230,7 +222,6 @@ void connection::handle_write_packet()
     // get filename
     strncpy(this->filename, ((struct WRQ_packet*)(this->packet_buffer))->strings, MAX_PACKET_SIZE-1);
     this->filename[MAX_PACKET_SIZE-1] = '\0';
-    cout << "DEBUG: requested file to create: " << this->filename << endl; // TODO: Remove me
 
     // check if file already exists
     ifstream intput_file (this->filename);
@@ -243,7 +234,6 @@ void connection::handle_write_packet()
 
     // open file for writing
     this->current_file.open(this->filename, ofstream::out | ofstream::binary | ofstream::ate);
-    // cout << "DEBUG: file should now be open: " << this->filename << endl; // TODO: Remove me
     if (!this->current_file.good()) {
         // error opening the file
         perror("TTFTP_ERROR: open() failed");
@@ -293,7 +283,6 @@ void connection::cancel_current_connection()
 
 void connection::handle_data_packet()
 {
-    cout << "DEBUG: got data request" << endl; // TODO: Remove me
 
     // check we already started writing
     if (!this->has_ongoing_client) {
@@ -371,7 +360,6 @@ void connection::handle_data_packet()
 
 void connection::send_unexpected_packet()
 {
-    cout << "DEBUG: sending unexpected packet error packet" << endl; // TODO: Remove me
 
     // send unexpected packet to current client
     ERROR_packet file_exists_packet = {htons(ERROR_OP), htons(ERROR_CODE_UNEXPECTED_PACKET), ERROR_MESSAGE_UNEXPECTED_PACKET};
