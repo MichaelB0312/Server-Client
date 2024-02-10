@@ -1,0 +1,13 @@
+# Trivial Trivial FTP Server
+
+Minimal implementation of TFTP server that only supports uploading files.
+
+Authors:
+Nir Eilam
+Michael Berko
+
+## Usage
+
+To compile run `make all`.
+To ready for submission run `make zip`
+To clean everything including submission zip run `make clean_all`
